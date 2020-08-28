@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Argon2</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link ref="stylesheet" href="https://bib.vetmed.fu-berlin.de/static/normalize/8/0/1/normalize.css" />
+    </head>
+    <body>
+        <form action="javascript:;" method="GET" autocomplete="off">
+            <fieldset>
+                <p>
+                    <strong>
+                        !!! Alle Daten werden angezeigt, auch das Passwort !!!
+                    </strong>
+                </p>
+                <p>
+                    <label>
+                        <strong>Passwort → E-Mail-Adresse:</strong>
+                        <br />
+                        <input
+                            type="text" minlength="0" maxlength="4194304"
+                            style="width:100%; box-sizing: border-box;"
+                            name="password" value=""
+                        />
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        <strong>Salt → Passwort:</strong>
+                        <br />
+                        <input
+                            type="text" minlength="0" maxlength="4194304"
+                            style="width:100%; box-sizing: border-box;"
+                            name="salt" value=""
+                        />
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        <strong>Secret key → <em>nichts</em>:</strong>
+                        <br />
+                        <input
+                            type="text" minlength="0" maxlength="4194304"
+                            style="width:100%; box-sizing: border-box;"
+                            name="key" value=""
+                        />
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        <strong>Associated data → Realm:</strong>
+                        <br />
+                        <input
+                            type="text" minlength="0" maxlength="4194304"
+                            style="width:100%; box-sizing: border-box;"
+                            name="ad" value=""
+                        />
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        <button type="submit">
+                            Hashen
+                        </button>
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        <strong>Hexadecimal:</strong>
+                        <br />
+                        <input type="text" name="hex" readonly style="width:100%; box-sizing: border-box;" />
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        <strong>Base64:</strong>
+                        <br />
+                        <input type="text" name="b64" readonly style="width:100%; box-sizing: border-box;" />
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        <strong>Dauer:</strong>
+                        <br />
+                        <input type="text" name="duration" readonly style="width:100%; box-sizing: border-box;" />
+                    </label>
+                </p>
+            </fieldset>
+        </form>
+
+        <script defer src="passwordhash.js"></script>
+
+<script defer>
+/*<![CDATA[*/
+(function (global) {
+    'use strict';
+
+    const { self, Worker, document, alert, btoa, performance } = global;
+
+    const form = document.querySelector('form');
+    form.addEventListener('submit', ev => {
+        ev.preventDefault();
+
+        const start = performance.now();
+        self.argon2_hash({
+            password: form.querySelector('[name=password]').value,
+            salt:     form.querySelector('[name=salt]').value,
+            key:      form.querySelector('[name=key]').value,
+            ad:       form.querySelector('[name=ad]').value,
+        }).then(
+            data => {
+                form.querySelector('[name=duration]').value = ((performance.now() - start) * 1e-3).toFixed(3) + ' s';
+
+                form.querySelector('[name=hex]').value = [].map.call(
+                    data,
+                    c => c.toString(16).padStart(2, '0'),
+                ).join(' ');
+                form.querySelector('[name=b64]').value = btoa(data);
+            },
+            () => {
+                form.querySelector('[name=duration]').value = ((performance.now() - start) * 1e-3).toFixed(3) + ' s';
+
+                form.querySelector('[name=hex]').value = 'Fehler :(';
+                form.querySelector('[name=b64]').value = 'Fehler :(';
+            },
+        );
+    });
+} (this));
+/*]]>*/
+        </script>
+    </body>
+</html>
