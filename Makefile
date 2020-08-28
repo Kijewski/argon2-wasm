@@ -6,6 +6,8 @@ all:
 
 .SECONDEXPANSION:
 
+.PHONY: all clean
+
 
 TARGETS := passwordhash
 
@@ -97,9 +99,14 @@ built/%.native: temp/%.native.combined.bc | built/
 	clang++ -O3 -fPIE -o $@ $<
 
 
-built/%.js: src/%.js | built
+built/%.js: src/%.js | built/
 	./convert.sh $@ $^
 
 
 built/%.html:  src/%.html
 	cp $< $@
+
+
+clean:
+	[ ! -d ./built/ ] || rm -r ./built/
+	[ ! -d ./temp/ ] || rm -r ./temp/

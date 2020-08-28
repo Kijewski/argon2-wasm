@@ -130,9 +130,11 @@ function run_worker () {
             let data;
             try {
                 success = !!argon2(memory_pos - B);
-                data = new Uint8Array(buffer, B).slice(0, tag_length);
+                data = u8view.slice(B, B + tag_length);
             } catch (ex) {
                 console.warn('Could not hash', ex);
+            } finally {
+                u8view.subarray(B, B + 1024 * memory_size_kb).fill(0);
             }
             self.postMessage({ success, data, callid });
         });

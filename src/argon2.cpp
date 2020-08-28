@@ -372,150 +372,146 @@ inline namespace {
     };
 
 
-    void hash(
-        void *digest_, uint32_t digest_length,
-        const void *message_, uint32_t message_length
-    ) {
-        uint8_t *digest = reinterpret_cast<uint8_t*>(digest_);
-        const uint8_t *message = reinterpret_cast<const uint8_t*>(message_);
-
-        if (digest_length <= 64) {
-            Blake2b::hash(digest_, digest_length, {
-                { &digest_length, sizeof(digest_length) },
-                { message, message_length },
-            });
-        } else {
-            alignas(512 / 8) uint8_t V1[64];
-            Blake2b::hash(V1, sizeof(V1), {
-                { &digest_length, sizeof(digest_length) },
-                { message, message_length },
-            });
-
-            while (true) {
-                memcpy(digest, V1, 32);
-                digest += 32;
-                digest_length -= 32;
-                if (digest_length <= 64) {
-                    break;
-                }
-                Blake2b::hash(V1, sizeof(V1), {
-                    { V1, sizeof(V1) },
-                });
-            }
-
-            Blake2b::hash(digest, digest_length, {
-                { V1, sizeof(V1) },
-            });
-        }
-    }
-    
-    uint64_t fBlaMka(uint64_t x, uint64_t y) {
-        constexpr uint64_t m = UINT64_C(0xFFFFFFFF);
-        uint64_t xy = (x & m) * (y & m);
-        return x + y + 2 * xy;
-    }
-
-
-    void argon2_G(uint64_t &a, uint64_t &b, uint64_t &c, uint64_t &d) {
-        a = fBlaMka(a, b);
-        d = ror(d ^ a, 32);
-        c = fBlaMka(c, d);
-        b = ror(b ^ c, 24);
-        a = fBlaMka(a, b);
-        d = ror(d ^ a, 16);
-        c = fBlaMka(c, d);
-        b = ror(b ^ c, 63);
-    }
-
-
-    void argon2_P(
-        uint64_t &v0, uint64_t &v1, uint64_t & v2, uint64_t & v3, uint64_t & v4, uint64_t & v5, uint64_t & v6, uint64_t & v7,
-        uint64_t &v8, uint64_t &v9, uint64_t &v10, uint64_t &v11, uint64_t &v12, uint64_t &v13, uint64_t &v14, uint64_t &v15
-    ) {
-        argon2_G(v0, v4,  v8, v12);
-        argon2_G(v1, v5,  v9, v13);
-        argon2_G(v2, v6, v10, v14);
-        argon2_G(v3, v7, v11, v15);
-
-        argon2_G(v0, v5, v10, v15);
-        argon2_G(v1, v6, v11, v12);
-        argon2_G(v2, v7,  v8, v13);
-        argon2_G(v3, v4,  v9, v14);
-    }
-
-
-    void argon2_fill_block(Block &N, const Block &X, const Block &Y, bool with_xor) {
-        Block R;
-        for (unsigned i = 0; i < 128; ++i) {
-            R.u64[i] = X.u64[i] ^ Y.u64[i];
-        }
-
-        Block T;
-        if (with_xor) {
-            for (unsigned i = 0; i < 128; ++i) {
-                T.u64[i] = R.u64[i] ^ N.u64[i];
-            }
-        } else {
-            T = R;
-        }
-
-        auto &r = R.u64;
-
-        for (unsigned i = 0; i < 8; ++i) {
-            argon2_P(
-                r[(16 * i) +  0], r[(16 * i) +  1], r[(16 * i) +  2], r[(16 * i) +  3],
-                r[(16 * i) +  4], r[(16 * i) +  5], r[(16 * i) +  6], r[(16 * i) +  7],
-                r[(16 * i) +  8], r[(16 * i) +  9], r[(16 * i) + 10], r[(16 * i) + 11],
-                r[(16 * i) + 12], r[(16 * i) + 13], r[(16 * i) + 14], r[(16 * i) + 15]
-            );
-        }
-
-        for (unsigned i = 0; i < 8; ++i) {
-            argon2_P(
-                r[(2 * i) +  0], r[(2 * i) +  1], r[(2 * i) +  16], r[(2 * i) +  17],
-                r[(2 * i) + 32], r[(2 * i) + 33], r[(2 * i) +  48], r[(2 * i) +  49],
-                r[(2 * i) + 64], r[(2 * i) + 65], r[(2 * i) +  80], r[(2 * i) +  81],
-                r[(2 * i) + 96], r[(2 * i) + 97], r[(2 * i) + 112], r[(2 * i) + 113]
-            );
-        }
-
-        for (unsigned i = 0; i < 128; ++i) {
-            N.u64[i] = T.u64[i] ^ R.u64[i];
-        }
-    }
-
-
-    uint32_t index_alpha(uint32_t pass_r, uint32_t slice_s, uint32_t index, uint32_t pseudo_rand) {
-        uint32_t reference_area_size;
-        if (pass_r > 0) {
-            reference_area_size = lane_length - segment_length + index - 1;
-        } else if (slice_s == 0) {
-            // First pass, first slice
-            reference_area_size = index - 1;
-        } else {
-            // First pass
-            reference_area_size = slice_s * segment_length + index - 1;
-        }
-
-        uint64_t relative_position = pseudo_rand;
-        relative_position = (relative_position * relative_position) >> 32;
-        relative_position = reference_area_size - 1 - ((reference_area_size * relative_position) >> 32);
-
-        uint32_t start_position = 0;
-        if (pass_r > 0 && slice_s != sync_points - 1) {
-            start_position = (slice_s + 1) * segment_length;
-        }
-
-        uint32_t absolute_position = (start_position + relative_position) % lane_length;
-        return absolute_position;
-    }
-
-
     __attribute__((visibility("default")))
     extern "C" Blocks B = {};
 
+
     class Argon2 {
     private:
+        static void hash(
+            void *digest_, uint32_t digest_length,
+            const void *message_, uint32_t message_length
+        ) {
+            uint8_t *digest = reinterpret_cast<uint8_t*>(digest_);
+            const uint8_t *message = reinterpret_cast<const uint8_t*>(message_);
+
+            if (digest_length <= 64) {
+                Blake2b::hash(digest_, digest_length, {
+                    { &digest_length, sizeof(digest_length) },
+                    { message, message_length },
+                });
+            } else {
+                alignas(512 / 8) uint8_t V1[64];
+                Blake2b::hash(V1, sizeof(V1), {
+                    { &digest_length, sizeof(digest_length) },
+                    { message, message_length },
+                });
+
+                while (true) {
+                    memcpy(digest, V1, 32);
+                    digest += 32;
+                    digest_length -= 32;
+                    if (digest_length <= 64) {
+                        break;
+                    }
+                    Blake2b::hash(V1, sizeof(V1), {
+                        { V1, sizeof(V1) },
+                    });
+                }
+
+                Blake2b::hash(digest, digest_length, {
+                    { V1, sizeof(V1) },
+                });
+            }
+        }
+
+        static uint64_t fBlaMka(uint64_t x, uint64_t y) {
+            constexpr uint64_t m = UINT64_C(0xFFFFFFFF);
+            uint64_t xy = (x & m) * (y & m);
+            return x + y + 2 * xy;
+        }
+
+        static void G(uint64_t &a, uint64_t &b, uint64_t &c, uint64_t &d) {
+            a = fBlaMka(a, b);
+            d = ror(d ^ a, 32);
+            c = fBlaMka(c, d);
+            b = ror(b ^ c, 24);
+            a = fBlaMka(a, b);
+            d = ror(d ^ a, 16);
+            c = fBlaMka(c, d);
+            b = ror(b ^ c, 63);
+        }
+
+        static void argon2_P(
+            uint64_t &v0, uint64_t &v1, uint64_t & v2, uint64_t & v3, uint64_t & v4, uint64_t & v5, uint64_t & v6, uint64_t & v7,
+            uint64_t &v8, uint64_t &v9, uint64_t &v10, uint64_t &v11, uint64_t &v12, uint64_t &v13, uint64_t &v14, uint64_t &v15
+        ) {
+            G(v0, v4,  v8, v12);
+            G(v1, v5,  v9, v13);
+            G(v2, v6, v10, v14);
+            G(v3, v7, v11, v15);
+
+            G(v0, v5, v10, v15);
+            G(v1, v6, v11, v12);
+            G(v2, v7,  v8, v13);
+            G(v3, v4,  v9, v14);
+        }
+
+        static void fill_block(Block &N, const Block &X, const Block &Y, bool with_xor) {
+            Block R;
+            for (unsigned i = 0; i < 128; ++i) {
+                R.u64[i] = X.u64[i] ^ Y.u64[i];
+            }
+
+            Block T;
+            if (with_xor) {
+                for (unsigned i = 0; i < 128; ++i) {
+                    T.u64[i] = R.u64[i] ^ N.u64[i];
+                }
+            } else {
+                T = R;
+            }
+
+            auto &r = R.u64;
+
+            for (unsigned i = 0; i < 8; ++i) {
+                argon2_P(
+                    r[(16 * i) +  0], r[(16 * i) +  1], r[(16 * i) +  2], r[(16 * i) +  3],
+                    r[(16 * i) +  4], r[(16 * i) +  5], r[(16 * i) +  6], r[(16 * i) +  7],
+                    r[(16 * i) +  8], r[(16 * i) +  9], r[(16 * i) + 10], r[(16 * i) + 11],
+                    r[(16 * i) + 12], r[(16 * i) + 13], r[(16 * i) + 14], r[(16 * i) + 15]
+                );
+            }
+
+            for (unsigned i = 0; i < 8; ++i) {
+                argon2_P(
+                    r[(2 * i) +  0], r[(2 * i) +  1], r[(2 * i) +  16], r[(2 * i) +  17],
+                    r[(2 * i) + 32], r[(2 * i) + 33], r[(2 * i) +  48], r[(2 * i) +  49],
+                    r[(2 * i) + 64], r[(2 * i) + 65], r[(2 * i) +  80], r[(2 * i) +  81],
+                    r[(2 * i) + 96], r[(2 * i) + 97], r[(2 * i) + 112], r[(2 * i) + 113]
+                );
+            }
+
+            for (unsigned i = 0; i < 128; ++i) {
+                N.u64[i] = T.u64[i] ^ R.u64[i];
+            }
+        }
+
+        static uint32_t index_alpha(uint32_t pass_r, uint32_t slice_s, uint32_t index, uint32_t pseudo_rand) {
+            uint32_t reference_area_size;
+            if (pass_r > 0) {
+                reference_area_size = lane_length - segment_length + index - 1;
+            } else if (slice_s == 0) {
+                // First pass, first slice
+                reference_area_size = index - 1;
+            } else {
+                // First pass
+                reference_area_size = slice_s * segment_length + index - 1;
+            }
+
+            uint64_t relative_position = pseudo_rand;
+            relative_position = (relative_position * relative_position) >> 32;
+            relative_position = reference_area_size - 1 - ((reference_area_size * relative_position) >> 32);
+
+            uint32_t start_position = 0;
+            if (pass_r > 0 && slice_s != sync_points - 1) {
+                start_position = (slice_s + 1) * segment_length;
+            }
+
+            uint32_t absolute_position = (start_position + relative_position) % lane_length;
+            return absolute_position;
+        }
+
         static void initialize(std::initializer_list<SrcLen> src_lens) {
             alignas(512 / 8) struct __attribute__((packed)) {
                 uint8_t H0[64];
@@ -565,7 +561,7 @@ inline namespace {
                 Block &curr_block = B[curr_offset];
                 Block &prev_block = B[prev_offset];
                 Block &ref_block = B[ref_index];
-                argon2_fill_block(curr_block, prev_block, ref_block, (pass_r > 0));
+                fill_block(curr_block, prev_block, ref_block, (pass_r > 0));
             }
         }
 
