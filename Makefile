@@ -103,7 +103,7 @@ built/%.js: src/%.js | built/
 	./convert.sh $@ $^
 
 
-built/%.html:  src/%.html
+built/%.html:  src/%.html | built/
 	cp $< $@
 
 
