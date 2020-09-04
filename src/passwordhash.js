@@ -109,12 +109,9 @@ function run_worker () {
     then(obj => {
         const { instance: { exports: { B, argon2, memory: { buffer } } } } = obj;
 
-        set_fn(function (data) {
-            const { callid } = data;
-            let { password, salt, key, ad } = data;
-            data = null;
-
+        set_fn(function ({ callid, password, salt, key, ad }) {
             let success = false;
+            let data;
             try {
                 const u8view = new Uint8Array(buffer);
                 try {

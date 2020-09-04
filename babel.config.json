@@ -37,21 +37,18 @@
         [ "closure-elimination",              {}, "inst1-closure-elimination" ],
         [ "minify-guarded-expressions",       {}, "inst1-minify-guarded-expressions" ],
         [ "minify-dead-code-elimination",     {}, "inst1-minify-dead-code-elimination" ],
-        [ "minify-simplify",                  {}, "inst1-minify-simplify" ],
 
         [ "@babel/plugin-transform-eval",     {}, "inst2-@babel/plugin-transform-eval" ],
         [ "minify-constant-folding",          {}, "inst2-minify-constant-folding" ],
         [ "closure-elimination",              {}, "inst2-closure-elimination" ],
         [ "minify-guarded-expressions",       {}, "inst2-minify-guarded-expressions" ],
         [ "minify-dead-code-elimination",     {}, "inst2-minify-dead-code-elimination" ],
-        [ "minify-simplify",                  {}, "inst2-minify-simplify" ],
 
         [ "@babel/plugin-transform-eval",     {}, "inst3-@babel/plugin-transform-eval" ],
         [ "minify-constant-folding",          {}, "inst3-minify-constant-folding" ],
         [ "closure-elimination",              {}, "inst3-closure-elimination" ],
         [ "minify-guarded-expressions",       {}, "inst3-minify-guarded-expressions" ],
         [ "minify-dead-code-elimination",     {}, "inst3-minify-dead-code-elimination" ],
-        [ "minify-simplify",                  {}, "inst3-minify-simplify" ],
 
         [ "func-wrap", { "format": "iife" } ],
 
