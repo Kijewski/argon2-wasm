@@ -116,7 +116,7 @@
                     data,
                     c => c.toString(16).padStart(2, '0'),
                 ).join(' ');
-                form.querySelector('[name=b64]').value = btoa(data);
+                form.querySelector('[name=b64]').value = btoa(String.fromCharCode.apply(null, data));
             },
             () => {
                 form.querySelector('[name=duration]').value = ((performance.now() - start) * 1e-3).toFixed(3) + ' s';

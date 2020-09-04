@@ -38,9 +38,9 @@ function run_script () {
         });
     }
 
-    self.argon2_hash = data => new Promise((resolve, reject) => {
+    self.argon2_hash = ({password, salt, key, ad}) => new Promise((resolve, reject) => {
         const callid = ++next_callid;
-        data = Object.assign({ callid }, data);
+        const data = { callid, password, salt, key, ad };
 
         promises[callid] = [reject, resolve];
 
@@ -145,10 +145,10 @@ function run_worker () {
                         }
                     }
 
-                    put_str(password); password = null;
-                    put_str(salt); salt = null;
-                    put_str(key); key = null;
-                    put_str(ad); ad = null;
+                    put_str(password);
+                    put_str(salt);
+                    put_str(key);
+                    put_str(ad);
 
                     success = !!argon2(memory_pos - B);
                     data = u8view.slice(B, B + tag_length);
