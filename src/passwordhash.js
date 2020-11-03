@@ -1,6 +1,6 @@
 const {
     fetch, Request, WebAssembly, console, TextEncoder, document,
-    Uint8Array, DataView, Promise, Worker, location, self,
+    Uint8Array, DataView, Promise, Worker, location, self, URL,
 } = new Function('return this')();
 
 const current_script_src = document?.currentScript?.src;
@@ -15,42 +15,49 @@ if (current_script_src) {
 
 function run_script () {
     let next_callid = 0;
-    const promises = {};
-    let worker;
 
-    function promise_worker () {
-        return worker ? Promise.resolve(worker) : new Promise((resolve, reject) => {
+    const promises = Object.create(null);
+
+    const worker_promise = (
+        fetch(current_script_src, { cache: 'force-cache' }).
+        then(response => response.blob()).
+        then(blob => {
+            let new_worker;
+            const url = URL.createObjectURL(blob)
             try {
-                const new_worker = new Worker(current_script_src, { credentials: 'omit' });
-                new_worker.addEventListener('message', ({ data: { success, data, callid } }) => {
-                    const resolve_reject = promises[callid];
-                    delete promises[callid];
-                    if (resolve_reject) {
-                        resolve_reject[+success](data);
-                    }
-                });
-                worker = new_worker;
-                resolve(worker)
-            } catch (ex) {
-                console.log('Could not initialize worker', ex);
-                reject();
+                new_worker = new Worker(url);
+            } finally {
+                URL.revokeObjectURL(url);
             }
-        });
-    }
-
-    self.argon2_hash = ({password, salt, key, ad}) => new Promise((resolve, reject) => {
-        const callid = ++next_callid;
-        const data = { callid, password, salt, key, ad };
-
-        promises[callid] = [reject, resolve];
-
-        promise_worker().then(worker => {
-            worker.postMessage(data);
-        }).catch(() => {
-            delete promises[callid];
-            reject();
+            new_worker.addEventListener('message', ({ data: { success, data, callid } }) => {
+                const resolve_reject = promises[callid];
+                delete promises[callid];
+                if (resolve_reject) {
+                    resolve_reject[+success](data);
+                }
+            });
+            return new_worker;
         })
-    });
+    );
+
+    self.argon2_hash = ({password, salt, key, ad}) => {
+        if ((salt || '').length < 8) {
+            return Promise.reject('no salt');
+        }
+
+        return new Promise((resolve, reject) => {
+            const callid = ++next_callid;
+            const data = { callid, password, salt, key, ad };
+
+            promises[callid] = [reject, resolve];
+
+            worker_promise.then(worker => { worker.postMessage(data); }).catch(() => {
+                console.log('Could not initialize worker');
+                delete promises[callid];
+                reject();
+            });
+        });
+    };
 }
 
 
@@ -87,23 +94,8 @@ function run_worker () {
         argon2_fn(data);
     });
 
-    new Promise((resolve, reject) => {
-        const url = location.href.replace(/(\.min|\.src|\.es[5-7]|\.js)+(?:[#?].*)?$/, '.wasm');
-        const req_init = {
-            method: 'GET',
-            mode: 'same-origin',
-            credentials: 'omit',
-            redirect: 'follow',
-            referrerPolicy: 'no-referrer',
-            cache: 'force-cache',
-        };
-        try {
-            resolve(fetch(new Request(url, req_init), req_init));
-        } catch (ex) {
-            console.log('Could not fetch', url);
-            reject();
-        }
-    }).
+
+    fetch(wasm_data_uri).
     then(response => response.arrayBuffer()).
     then(buffer => WebAssembly.instantiate(buffer)).
     then(obj => {

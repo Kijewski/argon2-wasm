@@ -11,7 +11,7 @@ all:
 
 TARGETS := passwordhash
 
-all: $(addprefix $(addprefix built/,${TARGETS}),.wasm .wasm.br .wasm.gz .native .js)
+all: $(addprefix $(addprefix built/,${TARGETS}),.wasm .wasm.br .wasm.gz .native .js .js.br .js.gz)
 
 all: $(addprefix $(addprefix built/,index),.html .html.br .html.gz)
 
@@ -87,6 +87,10 @@ built/%.wasm: temp/%.opt.wasm | built/
 	wasm-opt --strip-dwarf -o $@ $<
 
 
+temp/%.wasm.js: built/%.wasm | built/
+	echo "const wasm_data_uri = 'data:application/wasm;base64,$$(base64 -w0 $<)';" > $@
+
+
 built/%.gz: built/%
 	zopfli -c $< > $@
 
@@ -99,7 +103,7 @@ built/%.native: temp/%.native.combined.bc | built/
 	clang++ -O3 -fPIE -o $@ $<
 
 
-built/%.js: src/%.js | built/
+built/passwordhash.js: temp/passwordhash.wasm.js src/passwordhash.js | built/
 	./convert.sh $@ $^
 
 
